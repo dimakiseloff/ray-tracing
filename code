@@ -1,0 +1,80 @@
+%% 1. Константы и задаваемые величины
+R = 1000; % Радиус кривизны вогнутого зеркала [mm]
+d = 1/1200; % Шаг решетки [mm] (1200 линий/mm)
+gamma = 38.68 * pi/180; % Угол падения на решетку [rad]
+lambda0 = 0.0008; % Центральная длина волны [mm]
+c = 2.99e11; % Скорость света [mm/s]
+
+% Случай из рисунка 3: s1 = R
+s1 = R;
+
+% Диапазон длин волн
+lambda = linspace(0.0006,0.00095,1000); % [mm]
+
+%% Расчет фаз и углов
+theta_lambda0 = asin(lambda0/d - sin(gamma)); % угол дифракции на центральной длине волны
+theta0 = gamma - theta_lambda0; % разница углов
+
+% u1 = theta1
+theta1 = gamma - theta0 - asin(lambda./d - sin(gamma));
+
+% --- Лучевая трассировка зеркал ---
+phi1 = asin((1 - s1/R) .* sin(theta1));
+phi2 = phi1;
+theta2 = theta1 - 2 .* phi1;
+s2 = R .* (1 + sin(phi2)./sin(theta2));
+l0 = R * (1 - (1 - s1/R) * cos(theta0));
+l1 = R .* (sin(theta1 - phi1)./sin(theta1));
+l2 = R .* (sin(theta1 - phi1)./sin(theta2));
+
+s3 = s2 - R/2;
+theta3 = theta2;
+phi3 = asin((s3./(R/2) - 1).*sin(theta3));
+phi4 = phi3;
+theta4 = theta3 + 2.*phi3;
+s4 = (R/2) .* (1 - sin(phi3)./sin(theta4));
+l3 = (R/2) .* (sin(theta3 + phi3)./sin(theta3));
+l4 = (R/2) .* (sin(theta3 + phi3)./sin(theta4));
+
+s5 = s4 + R/2;
+theta5 = theta4;
+phi5 = asin((1 - s5/R).*sin(theta5));
+phi6 = phi5;
+theta6 = theta5 - 2.*phi5;
+s6 = R .* (1 + sin(phi6)./sin(theta6));
+l5 = R .* (sin(theta5 - phi5)./sin(theta5));
+l6 = R .* (sin(theta5 - phi5)./sin(theta6));
+
+%% Оптический путь (формулы A1)
+G = (s6 - s1).*cos(gamma - theta0);
+b = G./cos(gamma - theta0 - theta6);
+
+%% Фазовые поправки
+G0 = (2*R - 2*s1).*cos(gamma - theta0);
+b0 = 2*R - 2*s1;
+
+phase_correction1 = (2*pi*G/d) .* (tan(gamma - theta0 - theta6) - tan(gamma - theta0));
+phase_correction2 = (2*pi*G0/d) .* tan(gamma - theta0);
+
+%% Константа C и аберрация A
+C = 2*R - (R - s1).*cos(theta0);
+A = R.*( sin(theta1-phi1).*(1./sin(theta1)+1./sin(theta2))- 0.5.*sin(theta3+phi3).*(1./sin(theta3)+1./sin(theta4))+ sin(theta5-phi5).*(1./sin(theta5)+1./sin(theta6))+ R.*(sin(phi6)./sin(theta6).*cos(theta0)) );
+
+D = b .* (1 + cos(theta0 + theta6));
+
+%% Полная фаза (формула 16)
+omega = 2*pi*c ./ lambda;
+total_phase = (omega./c).*(C + A) - (omega./c).*(D) + phase_correction1 + phase_correction2;
+
+%% Групповая задержка (ГЗ)
+GD = -gradient(total_phase, omega); % [с], но масштабы соответствуют статье
+
+%% Перевод в фемтосекунды
+GD_fs = GD * 1e15;
+
+%% График
+figure; plot(lambda*1e6, GD_fs, 'LineWidth', 2);
+xlabel('\lambda (nm)');
+ylabel('GD (fs)');
+title('Group Delay vs Wavelength, s_1 = R');
+grid on;
